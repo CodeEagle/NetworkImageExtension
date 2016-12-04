@@ -27,6 +27,7 @@ private struct NetworkImageExtensionAssociatedKeys {
 }
 
 private struct NetworkImageExtensionCacheManager {
+    fileprivate static var session: URLSession?
     
     fileprivate static func ne_store(image: UIImage?, for url: URL?) {
         guard let value = url, let img = image else { return }
@@ -68,6 +69,13 @@ public extension NetworkImageExtensionProtocol {
         set(val) { objc_setAssociatedObject(some, &NetworkImageExtensionAssociatedKeys.URL, val, objc_AssociationPolicy.OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
     }
     
+    public var urlSession: URLSession? {
+        if NetworkImageExtensionCacheManager.session == nil {
+            NetworkImageExtensionCacheManager.session = URLSession(configuration:  URLSessionConfiguration.default)
+        }
+        return NetworkImageExtensionCacheManager.session
+    }
+    
     public func ne_imageFor(url: URL?) {
         if let img = NetworkImageExtensionCacheManager.ne_cachedImage(for: url)  {
             if let layer = ne_imageFillTarget.0 {
@@ -102,7 +110,7 @@ public extension NetworkImageExtensionProtocol {
         let request = URLRequest(url: value, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 20)
         
         DispatchQueue.global(qos: .userInteractive).async(execute: {
-            let task = URLSession.shared.dataTask(with: request, completionHandler: { [weak self](data, resp, _) in
+            let task = self.urlSession?.dataTask(with: request, completionHandler: { [weak self](data, resp, _) in
                 if let d = data, let img = UIImage(data: d), let sself = self {
                     if let reps = resp {
                         let cache = CachedURLResponse(response: reps, data: d)
@@ -121,7 +129,7 @@ public extension NetworkImageExtensionProtocol {
                     })
                 }
             })
-            task.resume()
+            task?.resume()
             self._downloadTask = task
         })
     }
